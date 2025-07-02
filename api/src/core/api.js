@@ -7,6 +7,7 @@ import { getVersion } from "@imput/version-info";
 import jwt from "../security/jwt.js";
 import stream from "../stream/stream.js";
 import match from "../processing/match.js";
+import subtitleOnly from "../processing/subtitle-only.js";
 
 import { env } from "../config.js";
 import { extract } from "../processing/url.js";
@@ -268,14 +269,26 @@ export const runAPI = async (express, app, __dirname, isPrimary = true) => {
     }
 
     try {
-      const result = await match({
-        host: parsed.host,
-        patternMatch: parsed.patternMatch,
-        params: normalizedRequest,
-        authType: req.authType ?? "none",
-      });
+      // Check if this is a subtitle-only request
+      if (request.subtitleOnly === true) {
+        const result = await subtitleOnly({
+          host: parsed.host,
+          patternMatch: parsed.patternMatch,
+          params: normalizedRequest,
+          authType: req.authType ?? "none",
+        });
 
-      res.status(result.status).json(result.body);
+        res.status(result.status).json(result.body);
+      } else {
+        const result = await match({
+          host: parsed.host,
+          patternMatch: parsed.patternMatch,
+          params: normalizedRequest,
+          authType: req.authType ?? "none",
+        });
+
+        res.status(result.status).json(result.body);
+      }
     } catch {
       fail(res, "error.api.generic");
     }

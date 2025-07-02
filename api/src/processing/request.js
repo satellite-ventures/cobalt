@@ -96,6 +96,16 @@ export function createResponse(responseType, responseData) {
                 }
                 break;
 
+            case "subtitle":
+                response = {
+                    url: responseData?.url,
+                    language: responseData?.language,
+                    service: responseData?.service,
+                    filename: responseData?.filename,
+                    metadata: responseData?.fileMetadata || undefined,
+                };
+                break;
+
             case "critical":
                 return internalError(responseData?.code);
 

@@ -60,5 +60,7 @@ export const apiSchema = z.object({
 
     youtubeHLS: z.boolean().default(false),
     youtubeBetterAudio: z.boolean().default(false),
+
+    subtitleOnly: z.boolean().default(false),
 })
 .strict();

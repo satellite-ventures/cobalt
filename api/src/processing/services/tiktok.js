@@ -101,21 +101,38 @@ export default async function(obj) {
 
     if (video) {
         let subtitles, fileMetadata;
-        if (obj.subtitleLang && detail?.video?.subtitleInfos?.length) {
-            const langCode = convertLanguageCode(obj.subtitleLang);
-            const subtitle = detail?.video?.subtitleInfos.find(
-                s => s.LanguageCodeName.startsWith(langCode) && s.Format === "webvtt"
-            )
-            if (subtitle) {
-                subtitles = subtitle.Url;
-                fileMetadata = {
-                    sublanguage: langCode,
+        let availableLangs = [];
+        let subtitleLangCode;
+        if (detail?.video?.subtitleInfos?.length) {
+            const webvttSubs = detail.video.subtitleInfos.filter(s => s.Format === "webvtt");
+            availableLangs = webvttSubs.map(s => s.LanguageCodeName);
+            if (obj.subtitleLang && webvttSubs.length) {
+                const langCode = convertLanguageCode(obj.subtitleLang);
+                const subtitle = webvttSubs.find(
+                    s => s.LanguageCodeName.startsWith(langCode)
+                );
+                if (subtitle) {
+                    subtitles = subtitle.Url;
+                    subtitleLangCode = subtitle.LanguageCodeName;
+                } else if (webvttSubs.length) {
+                    // Fallback: use first available subtitle
+                    subtitles = webvttSubs[0].Url;
+                    subtitleLangCode = webvttSubs[0].LanguageCodeName;
+                }
+                if (subtitles) {
+                    fileMetadata = {
+                        sublanguage: subtitleLangCode,
+                    }
                 }
             }
         }
+        // Get duration from video details
+        const duration = detail.video?.duration ? detail.video.duration : undefined;
         return {
             urls: video,
             subtitles,
+            duration,
+            availableLangs,
             fileMetadata,
             filename: videoFilename,
             headers: { cookie }

@@ -256,24 +256,31 @@ export default async function({ id, index, toGif, dispatcher, alwaysProxy, subti
     const extractSubtitles = async (hlsUrl) => {
         const mainHls = await fetch(hlsUrl).then(r => r.text()).catch(() => {});
         if (!mainHls) return;
-
-        const subtitle = HLS.parse(mainHls)?.variants[0]?.subtitles?.find(
+        let availableLangs = [];
+        const subtitlesArr = HLS.parse(mainHls)?.variants[0]?.subtitles;
+        if (subtitlesArr?.length) {
+            availableLangs = subtitlesArr.map(s => s.language);
+        }
+        let subtitle = subtitlesArr?.find(
             s => s.language.startsWith(subtitleLang)
         );
-        if (!subtitle) return;
-
+        let subtitleLangCode;
+        if (!subtitle && subtitlesArr?.length) {
+            // Fallback: use first available subtitle
+            subtitle = subtitlesArr[0];
+        }
+        if (!subtitle) return { availableLangs };
+        subtitleLangCode = subtitle.language;
         const subtitleUrl = new URL(subtitle.uri, hlsUrl).toString();
         const subtitleHls = await fetch(subtitleUrl).then(r => r.text());
-        if (!subtitleHls) return;
-
+        if (!subtitleHls) return { availableLangs };
         const finalSubtitlePath = HLS.parse(subtitleHls)?.segments?.[0].uri;
-        if (!finalSubtitlePath) return;
-
+        if (!finalSubtitlePath) return { availableLangs };
         const finalSubtitleUrl = new URL(finalSubtitlePath, hlsUrl).toString();
-
         return {
             url: finalSubtitleUrl,
-            language: subtitle.language,
+            language: subtitleLangCode,
+            availableLangs
         };
     }
 
@@ -296,20 +303,26 @@ export default async function({ id, index, toGif, dispatcher, alwaysProxy, subti
 
             let subtitles;
             let fileMetadata;
+            let availableLangs = [];
             if (mediaItem.type === "video" && subtitleLang) {
                 const hlsVariant = mediaItem.video_info?.variants?.find(
                     v => v.content_type === "application/x-mpegURL"
                 );
                 if (hlsVariant) {
-                    const { url, language } = await extractSubtitles(hlsVariant.url) || {};
-                    subtitles = url;
-                    if (language) fileMetadata = { sublanguage: language };
+                    const subResult = await extractSubtitles(hlsVariant.url) || {};
+                    subtitles = subResult.url;
+                    availableLangs = subResult.availableLangs || [];
+                    if (subResult.language) fileMetadata = { sublanguage: subResult.language };
                 }
             }
-
+            // Get duration from video_info
+            const duration = mediaItem.video_info?.duration_millis ? 
+                mediaItem.video_info.duration_millis : undefined;
             return {
                 type: subtitles || needsFixing(mediaItem) ? "remux" : "proxy",
                 urls: bestQuality(mediaItem.video_info.variants),
+                duration,
+                availableLangs,
                 filename: `twitter_${id}.mp4`,
                 audioFilename: `twitter_${id}_audio`,
                 isGif: mediaItem.type === "animated_gif",

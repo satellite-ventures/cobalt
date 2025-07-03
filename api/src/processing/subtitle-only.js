@@ -180,13 +180,15 @@ export default async function ({ host, patternMatch, params, authType }) {
       });
     }
 
-    // Check if subtitles were found
+    // Check if any subtitles were found
     if (!r.subtitles) {
       return createResponse("error", {
         code: "error.api.subtitles.not_found",
         context: {
           service: friendlyServiceName(host),
           language: subtitleLang,
+          duration: r.duration,
+          availableLangs: r.availableLangs || [],
         },
       });
     }
@@ -197,7 +199,11 @@ export default async function ({ host, patternMatch, params, authType }) {
       language: r.fileMetadata?.sublanguage || subtitleLang,
       service: host,
       filename: `subtitles_${host}_${patternMatch.id || patternMatch.postId || 'unknown'}.vtt`,
-      fileMetadata: r.fileMetadata || {},
+      fileMetadata: {
+        ...(r.fileMetadata || {}),
+        duration: r.duration,
+        availableLangs: r.availableLangs || [],
+      },
     });
   } catch (error) {
     return createResponse("error", {
